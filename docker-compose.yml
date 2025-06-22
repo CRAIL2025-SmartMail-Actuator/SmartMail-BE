@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@172.29.224.1:5432/email_categorizer
+      - EMAIL_HOST=${EMAIL_HOST}
+      - EMAIL_PORT=${EMAIL_PORT}
+      - EMAIL_USER=${EMAIL_USER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_USE_SSL=${EMAIL_USE_SSL}
+      - GROK_API_KEY=${GROK_API_KEY}
+      - FLASK_ENV=production
+      - SECRET_KEY=${SECRET_KEY}
+    depends_on:
+      - db
+    volumes:
+      - .:/app
+    command: ["gunicorn", "--bind", "0.0.0.0:5000", "--reload", "main:app"]
+
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: email_categorizer
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  postgres_data:

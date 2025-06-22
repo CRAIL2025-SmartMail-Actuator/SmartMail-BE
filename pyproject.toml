@@ -1,0 +1,37 @@
+[project]
+name = "smartmail-be"
+version = "0.1.0"
+description = "Email categorization system using Flask and GrokGPT"
+authors = [
+    {name = "Your Name", email = "your.email@example.com"},
+]
+dependencies = [
+    "flask>=3.0.0",
+    "flask-sqlalchemy>=3.1.1",
+    "psycopg2-binary>=2.9.9",
+    "langchain>=0.1.0",
+    "langchain-openai>=0.1.0",
+    "python-dotenv>=1.0.0",
+    "imaplib2>=3.6",
+    "email-validator>=2.1.1",
+    "gunicorn>=21.2.0",
+    "schedule>=1.2.0",
+    "langchain-groq>=0.3.2",
+]
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "MIT"}
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.4.4",
+    "black>=23.12.1",
+    "flake8>=7.0.0",
+]
