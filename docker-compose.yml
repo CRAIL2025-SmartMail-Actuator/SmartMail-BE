@@ -1,0 +1,30 @@
+
+services:
+  crail_be:
+    build: .
+    container_name: fastapi-dev
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL : "postgresql+asyncpg://postgres:postgres@localhost:5432/crail_be"
+    depends_on:
+      - crail_db
+
+  crail_db:
+    image: postgres:15
+    container_name: postgres-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: crail_be
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  pgdata:
