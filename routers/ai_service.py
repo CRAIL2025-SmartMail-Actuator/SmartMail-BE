@@ -318,7 +318,9 @@ def ai_reponse(user_id, user_name, user_email, customer_subject, customer_email)
     )
 
     # Example incoming email
-    result = email_flow.process_email(customer_subject + customer_email, current_user)
+    result = email_flow.process_email(
+        "Subject: " + customer_subject + customer_email, current_user
+    )
     return {
         "subject": result["response_email"]["response_email_subject"],
         "email_body": result["response_email"]["response_email_body"],
