@@ -1,6 +1,7 @@
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from .ai_service import ai_reponse
 import schemas
 import crud
 import models
@@ -17,51 +18,48 @@ async def generate_ai_response(
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # Initialize ai_res with a default value
+    ai_res = None
+    
     # Verify email belongs to user
-    email = await crud.get_email(db, request.email_id, current_user.id)
-    if not email:
-        raise HTTPException(status_code=404, detail="Email not found")
-
-    # Simulate AI response generation
-    start_time = time.time()
-
-    # Create AI response record
-    response_data = {
-        "email_id": request.email_id,
-        "suggestion": "Dear Customer,\n\nThank you for reaching out regarding your inquiry...",
-        "confidence": 0.92,
-        "tone": request.preferences.get("tone", "professional")
-        if request.preferences
-        else "professional",
-        "reasoning": "High confidence due to clear context. Used professional tone to match customer service standards.",
-        "alternative_suggestions": [
-            {
-                "suggestion": "Hi there,\n\nI'd be happy to help with your question...",
-                "tone": "friendly",
-                "confidence": 0.87,
-            }
-        ],
-        "used_documents": ["doc_123", "doc_456"],
-        "processing_time_ms": int((time.time() - start_time) * 1000),
-    }
-
-    db_response = await crud.create_ai_response(db, response_data)
-
+    try:
+        email = await crud.get_email(db, request.email_id, current_user.id)
+        if not email:
+            raise HTTPException(status_code=404, detail="Email not found")
+        
+        # Simulate AI response generation
+        start_time = time.time()
+        print(f"Generating AI response for email ID: {request.email_id}")
+        print(f"Email Subject: {email.subject}")
+        
+        ai_res = ai_reponse(current_user.id, "user", current_user.email, email.subject, email.body)
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions (like email not found)
+        raise
+    except Exception as e:
+        print(f"Error generating AI response: {e}")
+        print(f"Traceback: {e.__traceback__}")
+        # Handle the error appropriately
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to generate AI response"
+        )
+    
+    # Check if ai_res was successfully generated
+    if ai_res is None:
+        raise HTTPException(
+            status_code=500,
+            detail="AI response generation failed"
+        )
+    
+    response_data = ai_res
+    # db_response = await crud.create_ai_response(db, response_data)
+    
     return schemas.StandardResponse(
         success=True,
-        data={
-            "response_id": db_response.id,
-            "suggestion": db_response.suggestion,
-            "confidence": db_response.confidence,
-            "category": email.category.name if email.category else "General",
-            "tone": db_response.tone,
-            "reasoning": db_response.reasoning,
-            "alternative_suggestions": db_response.alternative_suggestions or [],
-            "used_documents": db_response.used_documents or [],
-            "processing_time_ms": db_response.processing_time_ms,
-        },
+        data=response_data,
     )
-
 
 @router.get("/responses", response_model=schemas.StandardResponse)
 async def get_ai_responses(
