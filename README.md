@@ -1,139 +1,238 @@
-# 📦 FastAPI Email Categorizer
+# 🧠 SmartMail
 
-A FastAPI application that processes and categorizes emails using external APIs, stores them in PostgreSQL, and provides REST endpoints.
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104.1-009688.svg?style=flat&logo=FastAPI)](https://fastapi.tiangolo.com)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
----
+> An intelligent email-processing backend built with FastAPI, featuring advanced vector search capabilities, email parsing, and comprehensive monitoring.
 
-## 🚀 Features
+## 📦 Version
 
-- 🔥 FastAPI + Uvicorn (hot-reload in development)
-- 📩 Email parsing and categorization
-- 🧠 AI-based processing via Grok API
-- 🐘 PostgreSQL for persistence
-- 🐳 Docker-ready
-- 🔐 Environment-based configuration
+**Current Version:** `1.0.0`
 
----
+## ✅ Project Overview
 
-## 📁 Project Structure
+SmartMail is a cutting-edge email processing backend that leverages the power of artificial intelligence and modern web technologies. Built with FastAPI, it provides:
 
-.
-│── main.py
-├── database.py
-├── models.py
-├── .env
-├── Dockerfile
-├── docker-compose.yml
-├── requirements.txt
-└── README.md
+- **🔍 Semantic Email Search** - Advanced vector search capabilities using Qdrant
+- **📧 Intelligent Email Parsing** - Automated email content extraction and processing
+- **📊 Real-time Monitoring** - Comprehensive error tracking with Sentry integration
+- **🚀 High Performance** - Asynchronous processing with FastAPI
+- **🔒 Data Validation** - Robust input validation using Pydantic models
 
----
+## 📌 Requirements
 
-## 🧑‍💻 Local Development (without Docker)
+- **Python 3.10+**
+- **Docker & Docker Compose**
+- **Git** (for version control)
 
-> ⚠️ Requires PostgreSQL running locally at `localhost:5432`  
-> Make sure `.env` has a valid `DATABASE_URL` pointing to your local DB.
+## ⚙️ Technologies Used
 
-### 1. Clone the Repo
+| Technology | Purpose | Version |
+|------------|---------|---------|
+| 🐍 **FastAPI** | Modern web framework | Latest |
+| 🧬 **Pydantic** | Data validation & serialization | Latest |
+| 🧱 **SQLAlchemy** | Object-Relational Mapping (ORM) | 2.0+ |
+| 🔁 **Alembic** | Database migrations | Latest |
+| 💥 **Sentry** | Error monitoring & performance tracking | Latest |
+| 📬 **PostgreSQL** | Relational database | 15+ |
+| 🔍 **Qdrant** | Vector search database for semantic search | Latest |
+
+## 🛠️ Development Setup Instructions
+
+### 1. 📥 Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/email-categorizer.git
-cd email-categorizer
-2. Create Virtual Environment
-bash
-Copy
-Edit
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-3. Install Requirements
-bash
-Copy
-Edit
+git clone https://github.com/your-username/smartmail.git
+cd smartmail
+```
+
+### 2. 📄 Set Up Environment Variables
+
+Copy the example environment file and configure it:
+
+```bash
+cp .env_example .env
+```
+
+Update the `.env` file with your specific configuration values:
+
+```env
+# Database Configuration
+DATABASE_URL=postgresql://username:password@localhost:5432/smartmail
+
+# Qdrant Configuration
+QDRANT_HOST=localhost
+QDRANT_PORT=6333
+
+# Sentry Configuration (Optional)
+SENTRY_DSN=your-sentry-dsn-here
+
+# Application Settings
+DEBUG=True
+SECRET_KEY=your-secret-key-here
+```
+
+### 3. 🐳 Start Dependencies Using Docker Compose
+
+Launch PostgreSQL and other services:
+
+```bash
+docker-compose up -d
+```
+
+This will start:
+- PostgreSQL database
+- Redis (for caching)
+- Any other configured services
+
+### 4. 🚀 Start Qdrant Vector Database
+
+If Qdrant is not included in your Docker Compose setup, start it separately:
+
+```bash
+docker run -p 6333:6333 -p 6334:6334 qdrant/qdrant
+```
+
+### 5. 📦 Install Python Dependencies
+
+Create a virtual environment and install requirements:
+
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
-4. Create .env
-env
-Copy
-Edit
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/email_categorizer
-EMAIL_HOST=smtp.gmail.com
-EMAIL_PORT=587
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASSWORD=your_password
-EMAIL_USE_SSL=True
-GROK_API_KEY=your_grok_api_key
-SECRET_KEY=your_secret_key
-5. Run the App
-bash
-Copy
-Edit
-uvicorn main:app --reload
-Visit: http://localhost:8000/docs
+```
 
-🐳 Run with Docker
-PostgreSQL will be started in a container.
+### 6. 🗃️ Run Database Migrations
 
-1. Build and Start
-bash
-Copy
-Edit
-docker-compose up --build
-2. Visit the App
-API: http://localhost:8000
+Initialize and run database migrations:
 
-Swagger Docs: http://localhost:8000/docs
+```bash
+alembic upgrade head
+```
 
-🛠️ Environment Variables
-Make sure your .env file contains:
+### 7. 🏃‍♂️ Run the Application
 
-env
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/email_categorizer  # or asyncpg for async SQLAlchemy
+Start the development server:
 
-In Docker, these are injected via docker-compose.yml.
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
-🐘 Local PostgreSQL DB Setup (if not using Docker)
-You can install PostgreSQL locally via:
+The API will be available at:
+- **Main API**: http://localhost:8000
+- **Interactive Docs**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
-Linux: sudo apt install postgresql
+## 🔍 Optional Integrations
 
-macOS: brew install postgresql
+### Sentry Error Monitoring
 
-Windows: Download PostgreSQL installer
+To enable comprehensive error monitoring and performance tracking:
 
-Then create a DB:
+1. Sign up for a [Sentry](https://sentry.io) account
+2. Create a new project for your FastAPI application
+3. Copy the DSN from your Sentry project settings
+4. Set the `SENTRY_DSN` environment variable in your `.env` file:
 
-bash
-Copy
-Edit
-createdb email_categorizer
-Ensure credentials match the DATABASE_URL in your .env.
+```env
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
+```
 
-✅ Requirements
-txt
-Copy
-Edit
-fastapi
-uvicorn[standard]
-sqlalchemy
-psycopg2-binary
-python-dotenv
-📫 API Endpoints
-GET /: Health check
+### Additional Integrations
 
-POST /emails/: Submit and categorize email
+- **📧 Email Providers**: Configure SMTP settings for email notifications
+- **🔐 Authentication**: JWT token-based authentication (already configured)
+- **📊 Monitoring**: Integration with monitoring tools like Prometheus/Grafana
 
-GET /emails/: List emails
+## 🧪 Running Tests
 
-GET /emails/{id}: Get single email
+Execute the test suite to ensure everything is working correctly:
 
-🔐 Security Notes
-Do not hardcode sensitive data.
+```bash
+# Run all tests
+pytest
 
-Use secrets in .env and never commit them to version control.
+# Run tests with coverage
+pytest --cov=app
 
-🧼 Clean Up
-bash
-docker-compose down -v  # Stops containers and removes volumes
-deactivate               # Exit virtual environment
-📜 License
-MIT License
+# Run specific test file
+pytest tests/test_api/test_emails.py
 
+# Run tests in verbose mode
+pytest -v
+```
+
+## 📚 API Usage Examples
+
+### Send Email for Processing
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/emails/process" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "subject": "Important Meeting",
+       "content": "Please join us for the quarterly review meeting.",
+       "sender": "manager@company.com"
+     }'
+```
+
+### Search Emails (Semantic Search)
+
+```bash
+curl -X GET "http://localhost:8000/api/v1/search?query=meeting%20quarterly&limit=10"
+```
+
+### Health Check
+
+```bash
+curl -X GET "http://localhost:8000/health"
+```
+
+## 🚀 Production Deployment
+
+### Using Docker
+
+```bash
+# Build the image
+docker build -t smartmail:latest .
+
+# Run the container
+docker run -p 8000:8000 --env-file .env smartmail:latest
+```
+
+### Environment Variables for Production
+
+```env
+DEBUG=False
+DATABASE_URL=postgresql://user:pass@prod-db:5432/smartmail
+SENTRY_DSN=your-production-sentry-dsn
+SECRET_KEY=your-super-secure-secret-key
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🙋‍♂️ Support
+
+- **📧 Email**: cogninesmartmail@gmail.com
