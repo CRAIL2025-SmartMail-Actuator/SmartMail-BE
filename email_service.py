@@ -8,7 +8,7 @@ import logging
 import time
 import threading
 from datetime import datetime
-from models import Email
+from models import Category, Email, SentEmail
 from categorizer import EmailCategorizer
 from db_sync import SyncSessionLocal  # Importing synchronous session
 
@@ -85,69 +85,121 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {str(e)}")
 
-    def process_email(self, email_message, message_id):
+    def process_email(self, email_message, message_id, mailbox_type):
         try:
             with SyncSessionLocal() as session:
                 sender = self.decode_header_value(email_message.get("From", ""))
+                recipients = self.decode_header_value(email_message.get("To", ""))
                 subject = self.decode_header_value(email_message.get("Subject", ""))
                 body = self.extract_email_content(email_message)
+                html_body = body
 
-                existing_email = (
-                    session.query(Email).filter_by(thread_id=message_id).first()
-                )
+                # Check if already processed (both tables)
+                if mailbox_type == "INBOX":
+                    existing_email = (
+                        session.query(Email).filter_by(thread_id=message_id).first()
+                    )
+                else:
+                    existing_email = (
+                        session.query(SentEmail)
+                        .filter_by(message_id=message_id)
+                        .first()
+                    )
+
                 if existing_email:
                     logger.info(f"Email {message_id} already processed")
                     return
 
-                new_email = Email(
-                    user_id=self.user_id,
-                    from_email=sender,
-                    from_name=None,  # Optional: Extract if needed from `sender`
-                    to_email=self.username,
-                    subject=subject,
-                    body=body,
-                    html_body=None,  # Optional: Extract from HTML parts if needed
-                    timestamp=datetime.utcnow(),
-                    is_read=False,
-                    is_starred=False,
-                    has_attachments=False,  # You can set based on email content inspection
-                    priority="normal",
-                    labels=[],  # You can customize this if labeling is added later
-                    thread_id=message_id,
-                    ai_analysis=None,
-                    category_id=None,  # Will be set after categorization
-                )
-                session.add(new_email)
+                if mailbox_type == "INBOX":
+                    new_email = Email(
+                        user_id=self.user_id,
+                        from_email=sender,
+                        from_name=None,
+                        to_email=self.username,
+                        subject=subject,
+                        body=body,
+                        html_body=html_body,
+                        timestamp=datetime.utcnow(),
+                        is_read=False,
+                        is_starred=False,
+                        has_attachments=False,
+                        priority="normal",
+                        labels=[],
+                        thread_id=message_id,
+                        ai_analysis=None,
+                        category_id=None,
+                    )
+                    session.add(new_email)
+                    # Categorize email
+                    try:
+                        categories = (
+                            session.query(Category)
+                            .filter_by(user_id=self.user_id)
+                            .all()
+                        )
+                        category = self.categorizer.categorize_email(
+                            subject, body, sender, self.user_id, categories
+                        )
+                        new_email.category_id = category if category else None
+                        session.commit()
+                        logger.info(
+                            f"Processed email from {sender} with subject '{subject}'"
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to categorize email {message_id}: {str(e)}"
+                        )
+                        new_email.category_id = None
+
+                elif mailbox_type == "[Gmail]/Sent Mail" or mailbox_type == "SENT":
+                    sent_email = SentEmail(
+                        message_id=message_id,
+                        original_email_id=None,  # Can be linked later via logic if needed
+                        sent_at=datetime.utcnow(),
+                        status="sent",
+                        recipients=[r.strip() for r in recipients.split(",")]
+                        if recipients
+                        else [],
+                        delivery_status="success",
+                        content=body,
+                        html_content=html_body,
+                        user_id=self.user_id,
+                    )
+                    session.add(sent_email)
+
                 session.commit()
-                logger.info(f"Processed email from {sender} with subject '{subject}'")
+                logger.info(f"Processed {mailbox_type} email with subject '{subject}'")
 
         except Exception as e:
             logger.error(f"Error processing email {message_id}: {str(e)}")
 
-    def fetch_unseen_emails(self):
+    def fetch_emails(self, mailbox_type="INBOX", search_type="ALL"):
         try:
             mail = self.connect_imap()
-            mail.select("INBOX")
-            status, messages = mail.search(None, "ALL")
+            mail.select(f'"{mailbox_type}"')
+            status, messages = mail.search(None, search_type)
             if status != "OK":
-                logger.warning("No new emails found.")
+                logger.warning(f"No emails found in {mailbox_type}.")
                 return
 
             for msg_id in messages[0].split()[-1:]:
                 _, msg_data = mail.fetch(msg_id, "(RFC822)")
                 email_message = email.message_from_bytes(msg_data[0][1])
                 message_id = email_message.get("Message-ID", f"msg_{msg_id.decode()}")
-                self.process_email(email_message, message_id)
+                self.process_email(email_message, message_id, mailbox_type)
 
             mail.close()
             mail.logout()
         except Exception as e:
-            logger.error(f"Error fetching unseen emails: {str(e)}")
+            logger.error(f"Error fetching emails from {mailbox_type}: {str(e)}")
 
     def monitor_loop(self):
         while self.monitoring:
             try:
-                self.fetch_unseen_emails()
+                self.fetch_emails("INBOX", "ALL")
+                self.fetch_emails(
+                    "[Gmail]/Sent Mail", "ALL"
+                )  # Or use "SENT" depending on provider
                 time.sleep(30)
             except Exception as e:
                 logger.error(f"Monitoring error: {str(e)}")

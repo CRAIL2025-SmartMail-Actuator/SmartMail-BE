@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 SECRET_KEY = "your-secret-key-here"  # Should be from environment
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 1200
 
 security = HTTPBearer()
 

@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 import schemas
@@ -6,6 +7,7 @@ import crud
 import models
 from database import get_db
 from auth import get_current_user
+from sqlalchemy.orm import selectinload
 
 router = APIRouter(prefix="/emails", tags=["Emails"])
 
@@ -20,7 +22,28 @@ async def get_inbox_emails(
     db: AsyncSession = Depends(get_db),
 ):
     skip = (page - 1) * limit
-    emails = await crud.get_emails(db, current_user.id, skip, limit)
+
+    # Use eager loading to load categories with emails
+    query = (
+        select(models.Email)
+        .options(selectinload(models.Email.category))  # Eager load category
+        .filter(models.Email.user_id == current_user.id)
+        .offset(skip)
+        .limit(limit)
+        .order_by(models.Email.timestamp.desc())  # Add ordering
+    )
+
+    result = await db.execute(query)
+    emails = result.scalars().all()
+
+    # Get total count for pagination
+    count_query = select(func.count(models.Email.id)).filter(
+        models.Email.user_id == current_user.id
+    )
+    count_result = await db.execute(count_query)
+    total_count = count_result.scalar()
+
+    total_pages = (total_count + limit - 1) // limit  # Calculate total pages
 
     email_responses = []
     for email in emails:
@@ -50,8 +73,71 @@ async def get_inbox_emails(
             "emails": email_responses,
             "pagination": {
                 "current_page": page,
-                "total_pages": 10,  # Calculate based on total count
-                "total_items": 200,  # Get actual count
+                "total_pages": total_pages,
+                "total_items": total_count,
+            },
+        },
+    )
+
+
+@router.get("/sent", response_model=schemas.StandardResponse)
+async def get_sent_emails(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    search: Optional[str] = Query(None),
+    current_user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    skip = (page - 1) * limit
+
+    # Fetch sent emails for the user
+    sent_emails = await db.execute(
+        select(models.SentEmail)
+        .where(models.SentEmail.user_id == current_user.id)
+        .order_by(models.SentEmail.sent_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    sent_email_records = sent_emails.scalars().all()
+
+    # Optional search filter
+    if search:
+        sent_email_records = [
+            email
+            for email in sent_email_records
+            if search.lower() in email.subject.lower()
+            or search.lower() in (email.content or "")
+        ]
+
+    email_responses = []
+    for email in sent_email_records:
+        email_responses.append(
+            {
+                "id": email.id,
+                "to": email.recipients,
+                "subject": email.subject
+                if hasattr(email, "subject")
+                else "",  # fallback
+                "content": email.content,
+                "html_content": email.html_content,
+                "sent_at": email.sent_at,
+                "status": email.status,
+                "delivery_status": email.delivery_status,
+            }
+        )
+
+    # Optional: compute total count for pagination
+    total = len(email_responses)
+    total_pages = (total // limit) + (1 if total % limit else 0)
+
+    return schemas.StandardResponse(
+        success=True,
+        data={
+            "emails": email_responses,
+            "pagination": {
+                "current_page": page,
+                "total_pages": total_pages,
+                "total_items": total,
             },
         },
     )
@@ -104,28 +190,58 @@ async def get_email_details(
 
 @router.patch("/{email_id}/read-status", response_model=schemas.StandardResponse)
 async def update_read_status(
-    email_id: str,
-    status_update: dict,
+    email_id: int,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Implementation would update read status
-    return schemas.StandardResponse(
-        success=True, data={"message": "Read status updated"}
-    )
+    try:
+        result = await db.execute(
+            select(models.Email).where(
+                models.Email.id == email_id,
+                models.Email.user_id == current_user.id,
+            )
+        )
+        email = result.scalar_one_or_none()
+        if not email:
+            raise HTTPException(status_code=404, detail="Email not found")
+
+        email.is_read = True
+        await db.commit()
+
+        return schemas.StandardResponse(
+            success=True,
+            data={"message": "Read status set to true", "is_read": True},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.patch("/{email_id}/star-status", response_model=schemas.StandardResponse)
 async def update_star_status(
-    email_id: str,
-    status_update: dict,
+    email_id: int,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Implementation would update star status
-    return schemas.StandardResponse(
-        success=True, data={"message": "Star status updated"}
-    )
+    try:
+        result = await db.execute(
+            select(models.Email).where(
+                models.Email.id == email_id,
+                models.Email.user_id == current_user.id,
+            )
+        )
+        email = result.scalar_one_or_none()
+        if not email:
+            raise HTTPException(status_code=404, detail="Email not found")
+
+        email.is_starred = True
+        await db.commit()
+
+        return schemas.StandardResponse(
+            success=True,
+            data={"message": "Star status set to true", "is_starred": True},
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/{email_id}/reply", response_model=schemas.StandardResponse)

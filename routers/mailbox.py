@@ -7,6 +7,7 @@ import schemas
 import models
 from database import get_db
 from auth import get_current_user
+from .moniter import manager as monitor_manager
 
 router = APIRouter(prefix="/mailbox", tags=["Mailbox"])
 
@@ -35,8 +36,8 @@ async def configure_mailbox(
         app_password=config.app_password,
         auto_reply_emails=config.auto_reply_emails,
         confidence_threshold=config.confidence_threshold,
-        enabled=config.enabled,
-        connection_status="disconnected",
+        enabled=False,
+        connection_status="connected",
         last_sync=None,
     )
 
@@ -91,7 +92,7 @@ async def test_mailbox_connection(
                 app_password=connection_test.app_password,
                 auto_reply_emails=[],
                 confidence_threshold=0.8,
-                enabled=True,
+                enabled=False,
                 connection_status="connected",
                 last_sync=datetime.utcnow(),
             )
@@ -139,7 +140,41 @@ async def get_mailbox_configuration(
                 "auto_reply_emails": config.auto_reply_emails,
                 "confidence_threshold": config.confidence_threshold,
                 "enabled": config.enabled,
+                "monitoring_status": monitor_manager.is_monitoring(config.id),
+                "auto_reply_enabled": config.auto_reply_enabled,
             }
             for config in configs
         ],
+    )
+
+
+@router.patch(
+    "/{mailbox_id}/toggle-auto-reply", response_model=schemas.StandardResponse
+)
+async def toggle_auto_reply_enabled(
+    mailbox_id: int,
+    toggle_data: dict,
+    current_user: models.User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(models.MailboxConfig).where(models.MailboxConfig.id == mailbox_id)
+    )
+    mailbox = result.scalar_one_or_none()
+
+    if not mailbox:
+        raise HTTPException(status_code=404, detail="Mailbox not found")
+
+    if mailbox.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    mailbox.auto_reply_enabled = not mailbox.auto_reply_enabled
+    await db.commit()
+    await db.refresh(mailbox)
+
+    return schemas.StandardResponse(
+        success=True,
+        data={
+            "message": f"Auto-reply {'enabled' if mailbox.auto_reply_enabled else 'disabled'} successfully"
+        },
     )

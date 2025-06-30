@@ -146,7 +146,7 @@ async def get_emails(
 
 
 async def get_email(
-    db: AsyncSession, email_id: str, user_id: int
+    db: AsyncSession, email_id: int, user_id: int
 ) -> Optional[models.Email]:
     result = await db.execute(
         select(models.Email)
@@ -163,7 +163,7 @@ async def get_email(
 async def create_ai_response(
     db: AsyncSession, response_data: dict
 ) -> models.AIResponse:
-    db_response = models.AIResponse(id=f"resp_{uuid.uuid4().hex[:8]}", **response_data)
+    db_response = models.AIResponse(**response_data)
     db.add(db_response)
     await db.flush()
     return db_response
@@ -212,3 +212,29 @@ async def get_activity_logs(
         .order_by(models.ActivityLog.timestamp.desc())
     )
     return result.scalars().all()
+
+
+async def get_document_by_id(db: AsyncSession, document_id: str):
+    result = await db.execute(
+        select(models.Document).where(models.Document.id == document_id)
+    )
+    return result.scalar_one_or_none()
+
+
+async def delete_document(db: AsyncSession, document_id: int):
+    result = await db.execute(
+        select(models.Document).where(models.Document.id == document_id)
+    )
+    document = result.scalar_one_or_none()
+    if document:
+        await db.delete(document)
+        await db.commit()
+
+
+async def get_auto_reply_rule(
+    db: AsyncSession, rule_id: int
+) -> models.AutoReplyRule | None:
+    result = await db.execute(
+        select(models.AutoReplyRule).where(models.AutoReplyRule.id == rule_id)
+    )
+    return result.scalar_one_or_none()

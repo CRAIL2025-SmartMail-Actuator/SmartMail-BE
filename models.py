@@ -128,6 +128,7 @@ class MailboxConfig(Base):
     connection_status = Column(String, default="disconnected")
     last_sync = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    auto_reply_enabled = Column(Boolean, default=False)
 
     user = relationship("User", back_populates="mailbox_configs")
 
@@ -250,6 +251,7 @@ class SentEmail(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     original_email_id = Column(Integer, ForeignKey("emails.id"))
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     message_id = Column(String)
     sent_at = Column(DateTime(timezone=True), server_default=func.now())
     status = Column(String, default="sent")

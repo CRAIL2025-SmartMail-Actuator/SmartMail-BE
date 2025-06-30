@@ -133,9 +133,9 @@ class EmailList(BaseModel):
 
 # AI Response Schemas
 class AIResponseRequest(BaseModel):
-    email_id: str
-    context: Optional[Dict[str, bool]] = None
-    preferences: Optional[Dict[str, str]] = None
+    email_id: int
+    context: Optional[Dict[str, Any]] = None
+    preferences: Optional[Dict[str, Any]] = None
 
 
 class AIResponseData(BaseModel):

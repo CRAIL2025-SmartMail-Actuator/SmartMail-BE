@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 import schemas
 import crud
@@ -48,12 +48,21 @@ async def create_auto_reply_rule(
 
 @router.put("/rules/{rule_id}", response_model=schemas.StandardResponse)
 async def update_auto_reply_rule(
-    rule_id: str,
+    rule_id: int,
     rule: schemas.AutoReplyRuleCreate,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Implementation would update the rule
+    db_rule = await crud.get_auto_reply_rule(db, rule_id)
+    if not db_rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    for key, value in rule.model_dump(exclude={"categories"}).items():
+        setattr(db_rule, key, value)
+
+    await db.commit()
+    await db.refresh(db_rule)
+
     return schemas.StandardResponse(
         success=True, data={"message": "Rule updated successfully"}
     )
@@ -61,11 +70,17 @@ async def update_auto_reply_rule(
 
 @router.delete("/rules/{rule_id}", response_model=schemas.StandardResponse)
 async def delete_auto_reply_rule(
-    rule_id: str,
+    rule_id: int,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Implementation would delete the rule
+    db_rule = await crud.get_auto_reply_rule(db, rule_id)
+    if not db_rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    await db.delete(db_rule)
+    await db.commit()
+
     return schemas.StandardResponse(
         success=True, data={"message": "Rule deleted successfully"}
     )
@@ -73,12 +88,24 @@ async def delete_auto_reply_rule(
 
 @router.patch("/rules/{rule_id}/toggle", response_model=schemas.StandardResponse)
 async def toggle_auto_reply_rule(
-    rule_id: str,
+    rule_id: int,
     toggle_data: dict,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Implementation would toggle rule enabled status
+    enabled = toggle_data.get("enabled")
+    if enabled is None:
+        raise HTTPException(status_code=400, detail="Missing 'enabled' field")
+
+    db_rule = await crud.get_auto_reply_rule(db, rule_id)
+    if not db_rule:
+        raise HTTPException(status_code=404, detail="Rule not found")
+
+    db_rule.enabled = enabled
+    await db.commit()
+    await db.refresh(db_rule)
+
     return schemas.StandardResponse(
-        success=True, data={"message": "Rule toggled successfully"}
+        success=True,
+        data={"message": f"Rule {'enabled' if enabled else 'disabled'} successfully"},
     )
