@@ -27,7 +27,7 @@ async def configure_mailbox(
     )
     existing = result.scalar_one_or_none()
     if existing:
-        raise HTTPException(status_code=400, detail="This email is already configured")
+        raise HTTPException(status_code=200, detail="This email is already configured")
 
     # Create new mailbox config
     new_config = models.MailboxConfig(
@@ -36,7 +36,7 @@ async def configure_mailbox(
         app_password=config.app_password,
         auto_reply_emails=config.auto_reply_emails,
         confidence_threshold=config.confidence_threshold,
-        enabled=False,
+        enabled=True,
         connection_status="connected",
         last_sync=None,
     )
@@ -84,19 +84,19 @@ async def test_mailbox_connection(
             # Update existing
             mailbox.connection_status = "connected"
             mailbox.last_sync = datetime.utcnow()
-        else:
-            # Create new MailboxConfig
-            new_config = models.MailboxConfig(
-                user_id=current_user.id,
-                email=connection_test.email,
-                app_password=connection_test.app_password,
-                auto_reply_emails=[],
-                confidence_threshold=0.8,
-                enabled=False,
-                connection_status="connected",
-                last_sync=datetime.utcnow(),
-            )
-            db.add(new_config)
+        # else:
+        #     # Create new MailboxConfig
+        #     new_config = models.MailboxConfig(
+        #         user_id=current_user.id,
+        #         email=connection_test.email,
+        #         app_password=connection_test.app_password,
+        #         auto_reply_emails=[],
+        #         confidence_threshold=0.8,
+        #         enabled=False,
+        #         connection_status="connected",
+        #         last_sync=datetime.utcnow(),
+        #     )
+        #     db.add(new_config)
 
         await db.commit()
 
@@ -127,8 +127,8 @@ async def get_mailbox_configuration(
     )
     configs = result.scalars().all()
 
-    if not configs:
-        raise HTTPException(status_code=400, detail="No mailbox configurations found")
+    # if not configs:
+    #     raise HTTPException(status_code=400, detail="No mailbox configurations found")
 
     return schemas.StandardResponse(
         success=True,

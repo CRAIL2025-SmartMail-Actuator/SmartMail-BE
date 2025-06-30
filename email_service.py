@@ -1,3 +1,4 @@
+from email.utils import formatdate, make_msgid
 import imaplib
 import email
 import smtplib
@@ -69,21 +70,38 @@ class EmailService:
                 pass
         return body.strip()
 
-    def send_email(self, to_email: str, subject: str, body_text: str):
+    def send_reply_email(
+        self,
+        to_email: str,
+        subject: str,
+        body_text: str,
+        in_reply_to: str = None,
+        references: str = None,
+    ):
         try:
             msg = MIMEMultipart()
             msg["From"] = self.username
             msg["To"] = to_email
             msg["Subject"] = subject
+            msg["Date"] = formatdate(localtime=True)
+            msg["Message-ID"] = make_msgid()
+
+            if in_reply_to:
+                msg["In-Reply-To"] = in_reply_to
+            if references:
+                msg["References"] = references
+
             msg.attach(MIMEText(body_text, "plain"))
 
             with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
                 server.login(self.username, self.password)
                 server.send_message(msg)
 
-            logger.info(f"Email sent to {to_email} successfully")
+            logger.info(f"Reply sent to {to_email} successfully")
+            return msg["Message-ID"]
         except Exception as e:
-            logger.error(f"Failed to send email to {to_email}: {str(e)}")
+            logger.error(f"Failed to send reply email: {str(e)}")
+            raise
 
     def process_email(self, email_message, message_id, mailbox_type):
         try:

@@ -274,3 +274,9 @@ class StandardResponse(BaseModel):
     success: bool
     data: Optional[Any] = None
     error: Optional[Dict[str, Any]] = None
+
+
+class ReplyData(BaseModel):
+    to: Optional[EmailStr] = None
+    subject: str
+    body: str

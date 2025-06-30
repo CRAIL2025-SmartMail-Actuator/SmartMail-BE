@@ -19,14 +19,12 @@ from langgraph.graph.message import MessagesState
 from typing import Optional
 
 
-
-
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 GROQ_API_KEY = "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"
 GROQ_MODEL = "llama-3.3-70b-versatile"
-QDRANT_HOST = "192.168.0.135"
+QDRANT_HOST = "192.168.0.242"
 QDRANT_PORT = int(6334)
 COLLECTION_NAME = "Crail_data"
 
@@ -303,10 +301,7 @@ class EmailResponseFlow:
             return {**initial_state, "error": f"Flow execution failed: {str(e)}"}
 
 
-def ai_reponse(
-    user_id, user_name, user_email, customer_subject, customer_email
-):
-
+def ai_reponse(user_id, user_name, user_email, customer_subject, customer_email):
     # Initialize the flow
     email_flow = EmailResponseFlow()
 

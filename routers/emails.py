@@ -1,7 +1,10 @@
+from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
+from db_sync import SyncSessionLocal
+from email_service import EmailService
 import schemas
 import crud
 import models
@@ -246,20 +249,60 @@ async def update_star_status(
 
 @router.post("/{email_id}/reply", response_model=schemas.StandardResponse)
 async def send_reply(
-    email_id: str,
-    reply_data: dict,
+    email_id: int,
+    reply_data: schemas.ReplyData,
     current_user: models.User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    # Implementation would send email reply
+    # Step 1: Fetch original email
+    original_email = await db.get(models.Email, email_id)
+    if not original_email or original_email.user_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Original email not found")
+
+    # Step 2: Get mailbox config (from synchronous DB session)
+    with SyncSessionLocal() as sync_db:
+        mailbox_config = (
+            sync_db.query(models.MailboxConfig)
+            .filter_by(user_id=current_user.id, email=original_email.to_email)
+            .first()
+        )
+        if not mailbox_config:
+            raise HTTPException(status_code=404, detail="Mailbox config not found")
+
+    # Step 3: Send email
+    email_service = EmailService(mailbox_config)
+    message_id = email_service.send_reply_email(
+        to_email=reply_data.to if reply_data.to else original_email.from_email,
+        subject=reply_data.subject,
+        body_text=reply_data.body,
+        in_reply_to=original_email.thread_id,
+        references=original_email.thread_id,
+    )
+
+    # Step 4: Save to SentEmail table
+    new_sent_email = models.SentEmail(
+        message_id=message_id,
+        original_email_id=original_email.id,
+        sent_at=datetime.utcnow(),
+        status="sent",
+        recipients=[reply_data.to],
+        delivery_status="success",
+        content=reply_data.body,
+        html_content=reply_data.body,
+        user_id=current_user.id,
+    )
+    db.add(new_sent_email)
+    await db.commit()
+    await db.refresh(new_sent_email)
+
     return schemas.StandardResponse(
         success=True,
         data={
-            "sent_email_id": "sent_123",
-            "message_id": "msg_123",
-            "sent_at": "2024-01-15T10:35:00Z",
-            "status": "sent",
-            "recipients": ["customer@example.com"],
-            "delivery_status": "delivered",
+            "sent_email_id": str(new_sent_email.id),
+            "message_id": new_sent_email.message_id,
+            "sent_at": new_sent_email.sent_at.isoformat(),
+            "status": new_sent_email.status,
+            "recipients": new_sent_email.recipients,
+            "delivery_status": new_sent_email.delivery_status,
         },
     )

@@ -20,20 +20,22 @@ async def generate_ai_response(
 ):
     # Initialize ai_res with a default value
     ai_res = None
-    
+
     # Verify email belongs to user
     try:
         email = await crud.get_email(db, request.email_id, current_user.id)
         if not email:
             raise HTTPException(status_code=404, detail="Email not found")
-        
+
         # Simulate AI response generation
         start_time = time.time()
         print(f"Generating AI response for email ID: {request.email_id}")
         print(f"Email Subject: {email.subject}")
-        
-        ai_res = ai_reponse(current_user.id, "user", current_user.email, email.subject, email.body)
-        
+
+        ai_res = ai_reponse(
+            current_user.id, "user", current_user.email, email.subject, email.body
+        )
+
     except HTTPException:
         # Re-raise HTTP exceptions (like email not found)
         raise
@@ -41,25 +43,20 @@ async def generate_ai_response(
         print(f"Error generating AI response: {e}")
         print(f"Traceback: {e.__traceback__}")
         # Handle the error appropriately
-        raise HTTPException(
-            status_code=500, 
-            detail="Failed to generate AI response"
-        )
-    
+        raise HTTPException(status_code=500, detail="Failed to generate AI response")
+
     # Check if ai_res was successfully generated
     if ai_res is None:
-        raise HTTPException(
-            status_code=500,
-            detail="AI response generation failed"
-        )
-    
+        raise HTTPException(status_code=500, detail="AI response generation failed")
+
     response_data = ai_res
     # db_response = await crud.create_ai_response(db, response_data)
-    
+
     return schemas.StandardResponse(
         success=True,
         data=response_data,
     )
+
 
 @router.get("/responses", response_model=schemas.StandardResponse)
 async def get_ai_responses(

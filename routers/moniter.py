@@ -78,7 +78,7 @@ async def start_monitoring_mailbox(
     except Exception as e:
         logger.error(f"Error starting monitor for mailbox {mailbox_id}: {str(e)}")
         raise HTTPException(
-            status_code=500, detail="Failed to start monitoring mailbox"
+            status_code=500, detail=f"Failed to start monitoring mailbox : {str(e)}"
         )
 
 
