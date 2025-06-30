@@ -22,11 +22,13 @@ from typing import Optional
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-GROQ_API_KEY = "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"
-GROQ_MODEL = "llama-3.3-70b-versatile"
-QDRANT_HOST = "192.168.0.242"
-QDRANT_PORT = int(6334)
-COLLECTION_NAME = "Crail_data"
+GROQ_API_KEY = os.getenv(
+    "GROQ_API_KEY", "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"
+)
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+QDRANT_HOST = os.getenv("QDRANT_HOST", "192.168.0.242")
+QDRANT_PORT = int(os.getenv("QDRANT_PORT", 6334))
+COLLECTION_NAME = os.getenv("QDRANT_COLLECTION_NAME", "Crail_data")
 
 
 @dataclass
@@ -195,30 +197,33 @@ class EmailResponseFlow:
             user = state["current_user"]
 
             prompt = f"""
-            You are {user.name} responding to an email inquiry.
+                        You are {user.name} responding to an email inquiry.
 
-            Original email:
-            {state["user_email"]}
+                        Original email:
+                        {state["user_email"]}
 
-            Email intent summary:
-            {state["email_summary"]}
-            {context}
+                        Email intent summary:
+                        {state["email_summary"]}
+                        {context}
 
-            Please generate a professional, helpful email response in JSON format that:
-            1. Addresses the sender's specific question or request
-            2. Uses the relevant information from the knowledge base if available
-            3. Maintains a professional and friendly tone
-            4. Includes appropriate email formatting (greeting, body, closing)
-            5. Signs off with {user.name}
+                        Sender name (if known): {state.get("sender_name", "")}
 
-            Return your response in this exact JSON format:
-            {{
-            "response_email_subject": "Subject line here...",
-            "response_email_body": "Full email body here, including greeting, content, and sign-off with {user.name}."
-            }}
+                        Please generate a professional, helpful email response in JSON format that:
+                        1. Addresses the sender's specific question or request
+                        2. Uses the relevant information from the knowledge base if available
+                        3. Maintains a professional and friendly tone
+                        4. Includes appropriate email formatting (greeting, body, closing)
+                        5. If sender_name is provided, personalize the greeting as "Dear <sender_name>,". If not, use "Dear," with no name.
+                        6. Signs off with {user.name}
 
-            Only return valid JSON. Do not include any explanations or text outside the JSON.
-            """
+                        Return your response in this exact JSON format:
+                        {{
+                        "response_email_subject": "Subject line here...",
+                        "response_email_body": "Full email body here, including greeting, content, and sign-off with {user.name}."
+                        }}
+
+                        Only return valid JSON. Do not include any explanations or text outside the JSON.
+                    """
 
             response = self.llm.invoke([HumanMessage(content=prompt)])
             response_json = json.loads(response.content)

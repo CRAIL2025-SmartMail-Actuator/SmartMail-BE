@@ -238,3 +238,14 @@ async def get_auto_reply_rule(
         select(models.AutoReplyRule).where(models.AutoReplyRule.id == rule_id)
     )
     return result.scalar_one_or_none()
+
+
+async def check_if_email_replied(db: AsyncSession, email_id: int, user_id: int) -> bool:
+    result = await db.execute(
+        select(models.SentEmail.id).where(
+            models.SentEmail.original_email_id == email_id,
+            models.SentEmail.user_id == user_id,
+        )
+    )
+    sent_email = result.scalar_one_or_none()
+    return sent_email is not None

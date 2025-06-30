@@ -67,6 +67,7 @@ async def get_inbox_emails(
             "labels": email.labels or [],
             "thread_id": email.thread_id,
             "ai_analysis": email.ai_analysis,
+            "replied": await crud.check_if_email_replied(db, email.id, current_user.id),
         }
         email_responses.append(email_dict)
 
@@ -187,6 +188,7 @@ async def get_email_details(
             "labels": email.labels or [],
             "thread": [],  # Would implement thread retrieval
             "attachments": attachments,
+            "replied": await crud.check_if_email_replied(db, email_id, current_user.id),
         },
     )
 

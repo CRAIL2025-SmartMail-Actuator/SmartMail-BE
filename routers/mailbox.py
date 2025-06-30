@@ -21,7 +21,6 @@ async def configure_mailbox(
     # Check if a mailbox with the same email already exists for the user
     result = await db.execute(
         select(models.MailboxConfig).where(
-            models.MailboxConfig.user_id == current_user.id,
             models.MailboxConfig.email == config.email,
         )
     )

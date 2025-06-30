@@ -6,10 +6,13 @@ from fastapi.security import HTTPBearer
 import crud
 from database import get_db
 from sqlalchemy.ext.asyncio import AsyncSession
+import os
 
-SECRET_KEY = "your-secret-key-here"  # Should be from environment
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 1200
+SECRET_KEY = os.getenv(
+    "SECRET_KEY", "qwertyuioplkjhgfdsazxcvbnjuytrewscgrewertyujhbvcd"
+)
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1200))
 
 security = HTTPBearer()
 

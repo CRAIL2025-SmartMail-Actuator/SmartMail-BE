@@ -101,7 +101,7 @@ class EmailCategorizer:
                     # Return the first available category as default, or handle as needed
                     default_category_id = list(category_map.values())[0]
                     logger.info(f"Defaulting to category ID: {default_category_id}")
-                    return default_category_id
+                    return None
 
         except Exception as e:
             logger.error(f"Error categorizing email: {str(e)}")

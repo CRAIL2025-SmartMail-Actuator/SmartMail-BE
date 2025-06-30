@@ -15,6 +15,10 @@ from routers import (
     user,
     moniter,
 )
+import sentry_sdk
+from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+import os
 
 
 @asynccontextmanager
@@ -24,6 +28,44 @@ async def lifespan(app: FastAPI):
         await conn.run_sync(Base.metadata.create_all)
     yield
 
+
+sentry_sdk.init(
+    dsn=os.getenv(
+        "SENTRY_DSN",
+        "https://d31daf5b6208594032d288b202a43101@o4509439020302336.ingest.us.sentry.io/4509588050477056",
+    ),
+    send_default_pii=True,
+    integrations=[
+        StarletteIntegration(
+            transaction_style="url",
+            failed_request_status_codes={400, *range(500, 599)},
+            http_methods_to_capture=(
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "PATCH",
+            ),
+        ),
+        FastApiIntegration(
+            transaction_style="url",
+            failed_request_status_codes={400, *range(500, 599)},
+            http_methods_to_capture=(
+                "GET",
+                "POST",
+                "PUT",
+                "DELETE",
+                "PATCH",
+            ),
+        ),
+    ],
+    environment=os.getenv("SENTRY_ENVIRONMENT", "development"),
+)
+
+print(
+    "Sentry initialized with environment:",
+    os.getenv("SENTRY_ENVIRONMENT", "development"),
+)
 
 app = FastAPI(
     title="Smart Email Auto-Responder API",
@@ -79,3 +121,8 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+
+@app.get("/sentry-debug")
+async def trigger_error():
+    return 1 / 0

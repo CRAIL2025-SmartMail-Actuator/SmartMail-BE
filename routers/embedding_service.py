@@ -3,11 +3,14 @@ import uuid
 from qdrant_client import QdrantClient
 from qdrant_client.models import VectorParams, Distance, PointStruct
 from sentence_transformers import SentenceTransformer
+import os
 
-
-client = QdrantClient("http://192.168.0.242", port=6334)
-model = SentenceTransformer("all-MiniLM-L6-v2")
-collection_name = "Crail_data"
+client = QdrantClient(
+    os.getenv("QDRANT_CLIENT", "http://localhost"),
+    port=int(os.getenv("QDRANT_PORT", 6334)),
+)
+model = SentenceTransformer(os.getenv("SENTENCE_TRANSFORMER_MODEL", "all-MiniLM-L6-v2"))
+collection_name = os.getenv("QDRANT_COLLECTION_NAME", "Crail_data")
 
 
 client.recreate_collection(

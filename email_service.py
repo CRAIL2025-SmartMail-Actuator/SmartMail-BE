@@ -1,4 +1,4 @@
-from email.utils import formatdate, make_msgid
+from email.utils import formatdate, make_msgid, parseaddr
 import imaplib
 import email
 import smtplib
@@ -11,7 +11,9 @@ import threading
 from datetime import datetime
 from models import Category, Email, SentEmail
 from categorizer import EmailCategorizer
-from db_sync import SyncSessionLocal  # Importing synchronous session
+from db_sync import SyncSessionLocal
+import models
+from routers.ai_service import ai_reponse  # Importing synchronous session
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,8 @@ class EmailService:
         self.use_ssl = True
         self.user_id = mailbox_config.user_id
         self.mailbox_config_id = mailbox_config.id
-
+        self.auto_reply_enabled = mailbox_config.auto_reply_enabled
+        self.confidence_threshold = mailbox_config.confidence_threshold
         self.categorizer = EmailCategorizer()
         self.monitoring = False
         self.monitor_thread = None
@@ -111,6 +114,8 @@ class EmailService:
                 subject = self.decode_header_value(email_message.get("Subject", ""))
                 body = self.extract_email_content(email_message)
                 html_body = body
+                raw_from = email_message.get("From")
+                from_name, from_email = parseaddr(raw_from)
 
                 # Check if already processed (both tables)
                 if mailbox_type == "INBOX":
@@ -131,8 +136,8 @@ class EmailService:
                 if mailbox_type == "INBOX":
                     new_email = Email(
                         user_id=self.user_id,
-                        from_email=sender,
-                        from_name=None,
+                        from_email=sender if sender else from_email,
+                        from_name=from_name if from_name else None,
                         to_email=self.username,
                         subject=subject,
                         body=body,
@@ -168,7 +173,57 @@ class EmailService:
                             f"Failed to categorize email {message_id}: {str(e)}"
                         )
                         new_email.category_id = None
-
+                    if self.auto_reply_enabled:
+                        try:
+                            ai_res = ai_reponse(
+                                self.user_id,
+                                "",
+                                self.username,
+                                new_email.subject,
+                                new_email.body,
+                            )
+                            if (
+                                ai_res
+                                and "subject" in ai_res
+                                and "email_body" in ai_res
+                                and "confidence_score" in ai_res
+                            ):
+                                subject = ai_res["subject"]
+                                confidence_score = ai_res["confidence_score"]
+                                body = ai_res["email_body"]
+                                print(f"AI Response: {ai_res}")
+                                print(f"Confidence Score: {confidence_score}")
+                                print(f"Email Subject: {new_email.subject}")
+                                print(f"Email Body: {new_email.body}")
+                                print(
+                                    self.auto_reply_enabled,
+                                    self.confidence_threshold,
+                                    "config",
+                                )
+                                if confidence_score >= self.confidence_threshold:
+                                    new_message_id = self.send_reply_email(
+                                        to_email=new_email.from_email,
+                                        subject=subject,
+                                        body_text=body,
+                                        in_reply_to=message_id,
+                                        references=message_id,
+                                    )
+                                    new_sent_email = models.SentEmail(
+                                        message_id=new_message_id,
+                                        original_email_id=new_email.id,
+                                        sent_at=datetime.utcnow(),
+                                        status="sent",
+                                        recipients=[new_email.from_email],
+                                        delivery_status="success",
+                                        content=body,
+                                        html_content=body,
+                                        user_id=self.user_id,
+                                    )
+                                    session.add(new_sent_email)
+                                    session.commit()
+                                    session.refresh(new_sent_email)
+                        except Exception as e:
+                            logger.error(f"Failed to send auto-reply: {str(e)}")
                 elif mailbox_type == "[Gmail]/Sent Mail" or mailbox_type == "SENT":
                     sent_email = SentEmail(
                         message_id=message_id,
